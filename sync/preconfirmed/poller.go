@@ -22,7 +22,7 @@ import (
 
 // This is a work-around. mockgen chokes when the instantiated generic type is in the interface.
 type Subscription struct {
-	*feed.Subscription[*pending.PreConfirmed]
+	*feed.Subscription[*core.WithBloom[*pending.PreConfirmed]]
 }
 
 // DataSource is the narrow surface the Poller needs from the wire side. Any
@@ -51,11 +51,12 @@ type DataSource interface {
 // each. Same-height polls (latest matches our mostRecent) skip backfill and land
 // in apply as delta / preserve / replace.
 type Poller struct {
-	dataSource         DataSource
-	blockchain         *blockchain.Blockchain
+	dataSource DataSource
+	blockchain *blockchain.Blockchain
+
 	highestBlockHeader *atomic.Pointer[core.Header]
 	interval           time.Duration
-	feed               *feed.Feed[*pending.PreConfirmed]
+	feed               *feed.Feed[*core.WithBloom[*pending.PreConfirmed]]
 	logger             log.StructuredLogger
 
 	preConfirmedChain *ChainStorage
@@ -75,11 +76,12 @@ func NewPoller(
 	logger log.StructuredLogger,
 ) *Poller {
 	return &Poller{
-		dataSource:         dataSource,
-		blockchain:         blockchain,
+		dataSource: dataSource,
+		blockchain: blockchain,
+
 		highestBlockHeader: highestBlockHeader,
 		interval:           interval,
-		feed:               feed.New[*pending.PreConfirmed](),
+		feed:               feed.New[*core.WithBloom[*pending.PreConfirmed]](),
 		logger:             logger,
 
 		preConfirmedChain: NewChainStorage(),
@@ -441,7 +443,6 @@ func makeEmptyPreConfirmedForParent(
 			Number:           latestHeader.Number + 1,
 			Timestamp:        uint64(time.Now().Unix()),
 			ProtocolVersion:  latestHeader.ProtocolVersion,
-			EventsBloom:      core.EventsBloom(receipts),
 			L1GasPriceETH:    latestHeader.L1GasPriceETH,
 			L1GasPriceSTRK:   latestHeader.L1GasPriceSTRK,
 			L2GasPrice:       latestHeader.L2GasPrice,
